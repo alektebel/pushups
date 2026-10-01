@@ -1,0 +1,20 @@
+# state
+data/state.json
+data/state.json.tmp
+
+# python
+__pycache__/
+*.pyc
+
+# node / whatsapp session
+wa/node_modules/
+wa/auth/
+wa/media/
+wa/processed.json
+wa/bot.log
+wa/bot.pid
+node_modules/
+
+# scratch
+*.mp4
+!examples/*.mp4

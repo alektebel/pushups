@@ -1,0 +1,13 @@
+{
+  "name": "pushups-wa",
+  "private": true,
+  "type": "module",
+  "description": "WhatsApp adapter: count push-up videos in a group and post a leaderboard",
+  "scripts": {
+    "start": "node bot.mjs"
+  },
+  "dependencies": {
+    "baileys": "7.0.0-rc14",
+    "pino": "^9.6.0"
+  }
+}

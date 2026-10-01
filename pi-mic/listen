@@ -1,0 +1,101 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# listen - capture speech and print a transcript on stdout.
+#
+#   listen                  record for MIC_SECONDS (default 8) and transcribe
+#   listen --android        use Android's built-in speech recognizer (default)
+#   listen --whisper 15     record 15s, then transcribe with the nan/whisper API
+#   listen -l es 12         language hint + duration
+#
+# Backend defaults to $MIC_BACKEND (android|whisper).
+# The android backend needs the Termux:API app; the whisper backend also
+# needs the `nan` client (uses whisper via api.nan.builders).
+
+set -uo pipefail
+
+backend="${MIC_BACKEND:-android}"
+secs="${MIC_SECONDS:-8}"
+lang="${MIC_LANGUAGE:-}"
+
+nan_bin=""
+for d in "$HOME/phone/bin" "$HOME/bin" "$PREFIX/bin"; do
+  if [ -x "$d/nan" ]; then nan_bin="$d/nan"; break; fi
+done
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --android) backend=android ;;
+    --whisper) backend=whisper ;;
+    -l|--language) lang="${2:-}"; shift ;;
+    ''|*[!0-9]*) : ;;
+    *) secs="$1" ;;
+  esac
+  shift
+done
+
+die() { echo "listen: $*" >&2; exit 1; }
+
+# Termux:API returns its permission errors as JSON on stdout with exit code 0.
+# Probe for it up front so both backends fail with one clear message.
+if command -v termux-microphone-record >/dev/null 2>&1; then
+  probe="$(termux-microphone-record -i 2>&1)"
+  case "$probe" in
+    *RECORD_AUDIO*|*permission*|*Permission*)
+      cat >&2 <<'MSG'
+listen: Termux:API does not have microphone permission.
+
+Grant it once:
+  1. Open Android Settings > Apps > Termux:API > Permissions
+  2. Allow Microphone
+
+Or run:  am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d package:com.termux.api
+MSG
+      exit 3
+      ;;
+  esac
+fi
+
+case "$backend" in
+  android)
+    command -v termux-speech-to-text >/dev/null 2>&1 || die "termux-speech-to-text not found (install the Termux:API app + pkg)"
+    out="$(termux-speech-to-text 2>/dev/null)" || true
+    # speech-to-text emits stray JSON braces when it fails; keep only real text
+    case "$out" in
+      *'"error"'*|'{'*'}'*) die "speech recognizer returned an error: $out" ;;
+    esac
+    case "$out" in
+      '}'|'{'|'{}'|'') : ;;
+      *) printf '%s' "$out" ;;
+    esac
+    ;;
+
+  whisper)
+    command -v termux-microphone-record >/dev/null 2>&1 || die "termux-microphone-record not found (install the Termux:API app + pkg)"
+    [ -n "$nan_bin" ] || die "nan client not found (expected ~/phone/bin/nan)"
+
+    cache="${XDG_CACHE_HOME:-$HOME/.cache}/mic"
+    mkdir -p "$cache" 2>/dev/null || { cache="${TMPDIR:-/tmp}/mic"; mkdir -p "$cache"; }
+    f="$cache/mic-$(date +%s).m4a"
+    rm -f "$f"
+
+    termux-microphone-record -f "$f" -l 0 -e aac >/dev/null 2>&1 || die "cannot start recording"
+    sleep "$secs"
+    termux-microphone-record -q >/dev/null 2>&1
+
+    # wait for the encoder to flush the last frames to disk
+    for _ in $(seq 1 30); do
+      [ -s "$f" ] && break
+      sleep 0.5
+    done
+    [ -s "$f" ] || die "recording produced no audio"
+
+    if [ -n "$lang" ]; then
+      "$nan_bin" stt "$f" -l "$lang"
+    else
+      "$nan_bin" stt "$f"
+    fi
+    ;;
+
+  *)
+    die "unknown backend: $backend (use android or whisper)"
+    ;;
+esac
