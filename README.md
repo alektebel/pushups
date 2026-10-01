@@ -39,6 +39,18 @@ Verified on two stock clips: **5 reps / 13 s** and **6 reps / 12 s**, with a
 clean `UP DOWN DOWN UP ...` timeline. Vision model defaults to `qwen3.8-flash`
 (`PUSHUP_VLM` to change).
 
+## Tests
+
+```bash
+uv venv .venv && uv pip install pytest --python .venv   # once
+.venv/bin/python -m pytest tests/ -q                    # core: 41 tests
+cd wa && npm install && node bot.test.mjs               # adapter: 12 tests
+```
+
+The Python suite stubs the vision API (mock mode + `reps.analyze`), so it
+needs no key, video, or network. The node suite covers the message parsing
+helpers; `bot.mjs` only starts WhatsApp when run directly.
+
 ## Use the core
 
 ```bash

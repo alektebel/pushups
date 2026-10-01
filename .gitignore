@@ -18,3 +18,5 @@ node_modules/
 # scratch
 *.mp4
 !examples/*.mp4
+.venv/
+.pytest_cache/

@@ -23,6 +23,7 @@ import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import {
 	Browsers,
 	DisconnectReason,
@@ -80,12 +81,12 @@ async function groupName(sock, jid) {
 	}
 }
 
-function messageText(m) {
+export function messageText(m) {
 	return m.message?.conversation || m.message?.extendedTextMessage?.text || "";
 }
 
 /** Pull the first video out of a message: a video caption without a body, or a video document. */
-function videoInfo(m) {
+export function videoInfo(m) {
 	const type = getContentType(m.message);
 	if (!type) return null;
 	const node = m.message[type];
@@ -262,7 +263,9 @@ async function main() {
 	await connect();
 }
 
-main().catch((e) => {
-	console.error(e);
-	process.exit(1);
-});
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+	main().catch((e) => {
+		console.error(e);
+		process.exit(1);
+	});
+}
